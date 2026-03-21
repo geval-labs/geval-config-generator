@@ -27,8 +27,8 @@ npm start
 
 ## Deploy on Vercel
 
-1. Push this folder to its own Git repository (or use a monorepo and set the **Root Directory** in Vercel to `geval-config-generator`).
-2. [Vercel](https://vercel.com) → **Add New Project** → import the repo.
+1. Push this repository to GitHub/GitLab/Bitbucket.
+2. [Vercel](https://vercel.com) → **Add New Project** → import the repo (repo root is the app root).
 3. Framework preset: **Next.js**. No environment variables required.
 4. Deploy.
 
