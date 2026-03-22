@@ -1,8 +1,20 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  Plus, 
+  Download, 
+  Check, 
+  AlertCircle, 
+  ShieldCheck, 
+  RefreshCcw,
+  ExternalLink,
+  Code2
+} from "lucide-react";
 import { ContractForm } from "@/components/ContractForm";
 import { PolicyEditor } from "@/components/PolicyEditor";
+import { YamlPreview } from "@/components/YamlPreview";
 import {
   appStateSchema,
   defaultAppState,
@@ -13,9 +25,9 @@ import { buildContractYaml, buildPolicyYaml } from "@/lib/geval-yaml";
 import {
   buildConfigZip,
   downloadBlob,
-  downloadText,
 } from "@/lib/zip-download";
 import { ZodError } from "zod";
+import { cn } from "@/lib/utils";
 
 function formatZodIssues(err: ZodError): string[] {
   return err.issues.map((i) => {
@@ -68,6 +80,7 @@ function rulePolicyErrors(err: ZodError): {
 export default function Home() {
   const [state, setState] = useState<AppState>(() => defaultAppState());
   const [lastError, setLastError] = useState<string[] | null>(null);
+  const [isPreviewCollapsed, setIsPreviewCollapsed] = useState(false);
 
   const parsed = useMemo(() => appStateSchema.safeParse(state), [state]);
 
@@ -75,6 +88,24 @@ export default function Home() {
     () => state.policies.map((p) => p.path.trim()),
     [state.policies],
   );
+
+  const previewFiles = useMemo(() => {
+    const files = [
+      { 
+        name: "contract.yaml", 
+        content: buildContractYaml(state.contract, policyPaths),
+        language: "yaml"
+      }
+    ];
+    state.policies.forEach((p, i) => {
+      files.push({
+        name: p.path || `policy-${i + 1}.yaml`,
+        content: buildPolicyYaml(p),
+        language: "yaml"
+      });
+    });
+    return files;
+  }, [state, policyPaths]);
 
   const errorDetails = useMemo(() => {
     if (parsed.success) return null;
@@ -91,30 +122,6 @@ export default function Home() {
     return false;
   }
 
-  function handleDownloadContract() {
-    if (!validate()) return;
-    const yaml = buildContractYaml(state.contract, policyPaths);
-    downloadText(yaml, "contract.yaml");
-  }
-
-  function handleDownloadPolicy(i: number) {
-    if (!validate()) return;
-    const name = state.policies[i].path.split("/").pop() || `policy-${i}.yaml`;
-    const yaml = buildPolicyYaml(state.policies[i]);
-    downloadText(yaml, name);
-  }
-
-  async function copyContractYaml() {
-    if (!validate()) return;
-    const yaml = buildContractYaml(state.contract, policyPaths);
-    await navigator.clipboard.writeText(yaml);
-  }
-
-  async function copyPolicyYaml(i: number) {
-    if (!validate()) return;
-    await navigator.clipboard.writeText(buildPolicyYaml(state.policies[i]));
-  }
-
   async function handleDownloadZip() {
     if (!validate()) return;
     const files: { path: string; content: string }[] = [
@@ -122,7 +129,7 @@ export default function Home() {
     ];
     for (const p of state.policies) {
       const rel = p.path.replace(/^\/+/, "");
-      files.push({ path: rel, content: buildPolicyYaml(p) });
+      files.push({ path: rel || "policy.yaml", content: buildPolicyYaml(p) });
     }
     const blob = await buildConfigZip(files);
     downloadBlob(blob, "geval-config.zip");
@@ -143,158 +150,268 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950">
-      <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-4 px-4 py-6">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-              Geval config generator
-            </h1>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              Build <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">contract.yaml</code>{" "}
-              and policy YAML for the{" "}
-              <a
-                href="https://github.com/geval/geval"
-                className="text-emerald-700 underline dark:text-emerald-400"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Geval
-              </a>{" "}
-              CLI. Validate locally with{" "}
-              <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">
-                geval validate-contract
-              </code>
-              .
-            </p>
+    <div className="min-h-screen">
+      {/* Navigation / Header */}
+      <motion.header
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="fixed top-0 left-0 right-0 z-50 px-4 sm:px-6 py-4"
+      >
+        <div className="mx-auto max-w-[1600px] glass border border-border/50 rounded-2xl flex items-center justify-between px-6 py-3">
+          <div className="flex items-center gap-3 group">
+            <div className="relative w-8 h-8 flex items-center justify-center bg-primary/20 rounded-lg group-hover:scale-110 transition-transform">
+              <ShieldCheck className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
+                Geval <span className="text-primary/80 font-medium text-sm hidden sm:inline">Config Generator</span>
+              </h1>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          
+          <div className="flex items-center gap-3">
             <button
-              type="button"
+              onClick={() => setIsPreviewCollapsed(!isPreviewCollapsed)}
+              className={cn(
+                "hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                isPreviewCollapsed 
+                  ? "bg-primary/20 text-primary border border-primary/30" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+              )}
+              title={isPreviewCollapsed ? "Expand Preview" : "Collapse Preview"}
+            >
+              <Code2 className="w-4 h-4" />
+              <span>{isPreviewCollapsed ? "Show Result" : "Hide Result"}</span>
+            </button>
+            <div className="h-4 w-px bg-border/50 hidden lg:block" />
+            <button
               onClick={() => setState(defaultAppState())}
-              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg transition-colors"
+              title="Reset Form"
             >
-              Reset
+              <RefreshCcw className="w-4 h-4" />
             </button>
-            <button
-              type="button"
-              onClick={validate}
-              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            <a
+              href="https://geval.io"
+              target="_blank"
+              rel="noreferrer"
+              className="hidden sm:flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-primary transition-colors"
             >
-              Validate
-            </button>
+              Master UI <ExternalLink className="w-3 h-3" />
+            </a>
+            <div className="h-4 w-px bg-border/50 hidden sm:block" />
             <button
-              type="button"
-              onClick={copyContractYaml}
-              className="rounded-lg border border-emerald-600 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
-            >
-              Copy contract YAML
-            </button>
-            <button
-              type="button"
-              onClick={handleDownloadContract}
-              className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-            >
-              Download contract.yaml
-            </button>
-            <button
-              type="button"
               onClick={handleDownloadZip}
-              className="rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/90 transition-all active:scale-[0.98] shadow-lg shadow-primary/20"
             >
-              Download ZIP
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">Download ZIP</span>
             </button>
           </div>
         </div>
-      </header>
+      </motion.header>
 
-      <main className="mx-auto max-w-4xl space-y-8 px-4 py-8">
-        {lastError && lastError.length > 0 && (
-          <div
-            className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"
-            role="alert"
-          >
-            <p className="font-semibold">Fix the following:</p>
-            <ul className="mt-2 list-inside list-disc">
-              {lastError.map((e, i) => (
-                <li key={i}>{e}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <ContractForm
-          value={state.contract}
-          onChange={(contract) => setState((s) => ({ ...s, contract }))}
-        />
-
-        <div className="rounded-lg border border-blue-200 bg-blue-50/80 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
-          <strong>Policy paths in contract</strong> (order matches policies below):
-          <ol className="mt-2 list-inside list-decimal font-mono text-xs">
-            {policyPaths.map((p, i) => (
-              <li key={i}>{p || "(empty)"}</li>
-            ))}
-          </ol>
-        </div>
-
-        {state.policies.map((policy, i) => (
-          <PolicyEditor
-            key={i}
-            value={policy}
-            index={i}
-            onChange={(p) =>
-              setState((s) => ({
-                ...s,
-                policies: s.policies.map((x, j) => (j === i ? p : x)),
-              }))
-            }
-            onRemove={() => handleRemovePolicy(i)}
-            canRemove={state.policies.length > 1}
-            ruleErrors={
-              parsed.success ? undefined : errorDetails?.byPolicy[i]
-            }
-            policyErrors={
-              parsed.success ? undefined : errorDetails?.policyFields[i]
-            }
-          />
-        ))}
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={handleAddPolicy}
-            className="rounded-lg border border-dashed border-zinc-400 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-white dark:border-zinc-500 dark:text-zinc-300 dark:hover:bg-zinc-900"
-          >
-            + Add policy
-          </button>
-        </div>
-
-        <section className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-900">
-          <h2 className="mb-3 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-            Per-policy download
-          </h2>
-          <div className="flex flex-wrap gap-2">
-            {state.policies.map((p, i) => (
-              <span key={i} className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => copyPolicyYaml(i)}
-                  className="rounded-lg border border-zinc-400 px-3 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-500 dark:text-zinc-200 dark:hover:bg-zinc-800"
+      <main className="mx-auto max-w-[1600px] px-6 pt-24 pb-24">
+        <div className={cn(
+          "grid grid-cols-1 gap-12 items-start transition-all duration-500 ease-in-out",
+          isPreviewCollapsed ? "lg:grid-cols-1" : "lg:grid-cols-[1.5fr_1fr]"
+        )}>
+          {/* Left Column: Form */}
+          <div className="space-y-12">
+            {/* Global Errors */}
+            <AnimatePresence>
+              {lastError && lastError.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
                 >
-                  Copy {p.path.split("/").pop() || `policy-${i}`}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDownloadPolicy(i)}
-                  className="rounded-lg bg-zinc-200 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-600"
-                >
-                  Download {p.path.split("/").pop() || `policy-${i}.yaml`}
-                </button>
-              </span>
-            ))}
+                  <div
+                    className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5 flex gap-4"
+                    role="alert"
+                  >
+                    <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-destructive">Configuration Errors</p>
+                      <ul className="mt-2 space-y-1 text-sm text-destructive/80">
+                        {lastError.map((e, i) => (
+                          <li key={i}>{e}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Section 1: Contract */}
+            <section className="space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-secondary border border-border/50 font-bold text-primary">
+                  01
+                </div>
+                <h3 className="text-xl font-bold">Release Contract</h3>
+              </div>
+              
+              <motion.div 
+                layout
+                className="rounded-2xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden"
+              >
+                <div className="p-6">
+                  <ContractForm
+                    value={state.contract}
+                    onChange={(contract) => setState((s) => ({ ...s, contract }))}
+                  />
+                </div>
+              </motion.div>
+            </section>
+
+            {/* Section 2: Policies */}
+            <section className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-secondary border border-border/50 font-bold text-primary">
+                    02
+                  </div>
+                  <h3 className="text-xl font-bold">Enforcement Policies</h3>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground mr-2">{state.policies.length} Active Policies</span>
+                  <button
+                    type="button"
+                    onClick={handleAddPolicy}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-secondary hover:bg-secondary/80 border border-border/50 rounded-lg text-xs font-semibold text-foreground transition-all"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add Policy
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-8 relative">
+                <div className="absolute left-[19px] top-0 bottom-0 w-0.5 bg-border/20 -z-10" />
+                
+                <AnimatePresence mode="popLayout" initial={false}>
+                  {state.policies.map((policy, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 10 }}
+                      transition={{ duration: 0.3, delay: i * 0.05 }}
+                      className="relative"
+                    >
+                      <PolicyEditor
+                        value={policy}
+                        index={i}
+                        onChange={(p) =>
+                          setState((s) => ({
+                            ...s,
+                            policies: s.policies.map((x, j) => (j === i ? p : x)),
+                          }))
+                        }
+                        onRemove={() => handleRemovePolicy(i)}
+                        canRemove={state.policies.length > 1}
+                        ruleErrors={
+                          parsed.success ? undefined : errorDetails?.byPolicy[i]
+                        }
+                        policyErrors={
+                          parsed.success ? undefined : errorDetails?.policyFields[i]
+                        }
+                      />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+                {!isPreviewCollapsed && (
+                  <div className="pt-8">
+                     <button
+                        type="button"
+                        onClick={handleAddPolicy}
+                        className="w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed border-border/50 rounded-2xl text-muted-foreground hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all group"
+                      >
+                        <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                        <span className="font-semibold">Add Another Policy</span>
+                      </button>
+                  </div>
+                )}
+              </div>
+            </section>
           </div>
-        </section>
+
+          {/* Right Column: Sticky Preview */}
+          <AnimatePresence mode="wait">
+            {!isPreviewCollapsed && (
+              <motion.aside 
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                className="lg:sticky lg:top-24 h-[calc(100vh-120px)] min-h-[600px] hidden lg:block"
+              >
+                <div className="flex flex-col h-full space-y-6">
+                   <YamlPreview files={previewFiles} />
+                   
+                   {/* Quick Info */}
+                   <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6 space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/20 rounded-lg">
+                          <Code2 className="w-4 h-4 text-primary" />
+                        </div>
+                        <h4 className="text-sm font-bold">Quick Integration</h4>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        The output reflects your settings in real-time. Once satisfied, download the package.
+                      </p>
+                      <button
+                        onClick={handleDownloadZip}
+                        className="w-full flex items-center justify-center gap-2 py-3 bg-primary text-primary-foreground rounded-xl text-xs font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 active:scale-95"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Download Configuration
+                      </button>
+                   </div>
+                </div>
+              </motion.aside>
+            )}
+          </AnimatePresence>
+        </div>
       </main>
+
+      <footer className="border-t border-border/50 py-12 px-6 mt-12">
+        <div className="mx-auto max-w-[1600px] flex flex-col sm:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-2 opacity-50">
+            <ShieldCheck className="w-5 h-5 text-primary" />
+            <span className="text-sm font-semibold uppercase tracking-widest text-foreground">Geval CLI</span>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Built with precision for AI engineers.
+          </p>
+          <div className="flex items-center gap-6">
+            <a href="https://github.com/geval-labs/geval" className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium">GitHub</a>
+            <a href="https://geval.io" className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium">Docs</a>
+          </div>
+        </div>
+      </footer>
+
+      {/* Floating Toggle for Mobile or to show collapsed state */}
+      <AnimatePresence>
+        {isPreviewCollapsed && (
+          <motion.button
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            onClick={() => setIsPreviewCollapsed(false)}
+            className="fixed bottom-8 right-8 z-[60] w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all group"
+            title="Expand Preview"
+          >
+            <Code2 className="w-6 h-6" />
+            <span className="absolute -top-12 right-0 bg-background border border-border px-3 py-1.5 rounded-lg text-xs font-bold text-foreground opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-xl">
+              Show YAML Result
+            </span>
+          </motion.button>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
