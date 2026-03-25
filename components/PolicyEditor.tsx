@@ -1,7 +1,7 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
-import { FileCode, Trash2, Plus, AlertCircle, Settings2, Globe, Server } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { FileCode, Trash2, Plus, AlertCircle, Globe } from "lucide-react";
 import type { PolicyForm } from "@/lib/schemas";
 import { defaultRule } from "@/lib/schemas";
 import { RuleRow } from "./RuleRow";
@@ -28,9 +28,8 @@ export function PolicyEditor({
 }: Props) {
   return (
     <div className="group relative pl-12">
-      {/* Policy Number Badge */}
       <div className="absolute left-0 top-0 flex items-center justify-center w-10 h-10 rounded-xl bg-card border border-border font-bold text-xs text-muted-foreground group-hover:border-primary/50 group-hover:text-primary transition-colors z-10">
-        {String(index + 1).padStart(2, '0')}
+        {String(index + 1).padStart(2, "0")}
       </div>
 
       <section className="rounded-2xl border border-border bg-card/50 backdrop-blur-sm overflow-hidden hover:border-border/80 transition-colors shadow-sm">
@@ -42,10 +41,10 @@ export function PolicyEditor({
               </div>
               <div>
                 <h2 className="text-lg font-bold text-foreground">
-                  {value.name || `Policy ${index + 1}`}
+                  Policy {index + 1}
                 </h2>
                 <p className="text-xs text-muted-foreground font-mono">
-                  {value.path || "No path defined"}
+                  {value.path || "No path"}
                 </p>
               </div>
             </div>
@@ -61,56 +60,30 @@ export function PolicyEditor({
             )}
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="space-y-1.5 sm:col-span-2">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <Globe className="w-3 h-3" /> File Path
-              </label>
-              <input
-                className={cn(
-                  "w-full rounded-xl border border-border bg-background px-4 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/20",
-                  policyErrors.path && "border-destructive/50 ring-destructive/10"
-                )}
-                value={value.path}
-                onChange={(e) => onChange({ ...value, path: e.target.value })}
-                placeholder="policies/security.yaml"
-              />
-              {policyErrors.path && (
-                <p className="text-[10px] text-destructive flex items-center gap-1 mt-1 font-medium">
-                  <AlertCircle className="w-3 h-3" /> {policyErrors.path}
-                </p>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Globe className="w-3 h-3" /> Policy file path
+            </label>
+            <input
+              className={cn(
+                "w-full rounded-xl border border-border bg-background px-4 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/20",
+                policyErrors.path && "border-destructive/50 ring-destructive/10",
               )}
-            </div>
-            
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <Settings2 className="w-3 h-3" /> Policy Name
-              </label>
-              <input
-                className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                value={value.name}
-                onChange={(e) => onChange({ ...value, name: e.target.value })}
-                placeholder="Security Audit"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <Server className="w-3 h-3" /> Env
-              </label>
-              <input
-                className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                value={value.environment}
-                onChange={(e) => onChange({ ...value, environment: e.target.value })}
-                placeholder="prod"
-              />
-            </div>
+              value={value.path}
+              onChange={(e) => onChange({ ...value, path: e.target.value })}
+              placeholder="policy.yaml"
+            />
+            {policyErrors.path && (
+              <p className="text-[10px] text-destructive flex items-center gap-1 mt-1 font-medium">
+                <AlertCircle className="w-3 h-3" /> {policyErrors.path}
+              </p>
+            )}
           </div>
 
           <div className="space-y-4 pt-2">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/50 px-1">
-                Rules & Signals
+                Rules
               </h4>
               {policyErrors.rules && (
                 <p className="text-[10px] text-destructive flex items-center gap-1 font-medium">
@@ -161,7 +134,7 @@ export function PolicyEditor({
               className="w-full mt-4 flex items-center justify-center gap-2 py-3 border-2 border-dashed border-border hover:border-primary/30 hover:bg-primary/5 rounded-2xl text-xs font-bold text-muted-foreground hover:text-primary transition-all group/add"
             >
               <Plus className="w-4 h-4 group-hover/add:scale-110 transition-transform" />
-              Add Enforcement Rule
+              Add rule
             </button>
           </div>
         </div>

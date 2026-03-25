@@ -9,6 +9,11 @@ geval validate-contract contract.yaml path/to/other-policy.yaml
 geval check --contract contract.yaml --signals signals.json
 ```
 
+## Pages
+
+- **`/` (Editor)** — Minimal contract + policy form, YAML preview, ZIP download, and **Execute policy** (needs `geval` on the machine running the dev server).
+- **`/run`** — Paste or edit contract, policy, and signals YAML/JSON, then **Run Geval** for a JSON decision (same CLI requirement).
+
 ## Develop
 
 ```bash
@@ -16,7 +21,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000). Install the [Geval CLI](https://github.com/geval-labs/geval) locally and ensure `geval` is on `PATH` for execute features, or set `GEVAL_PATH` to the binary.
 
 ## Build
 
@@ -37,6 +42,8 @@ Output is static-friendly; the app works as a standard Next.js deployment.
 ## Schema drift
 
 If Geval’s contract/policy YAML shape changes, update `lib/schemas.ts` and `lib/geval-yaml.ts` here, or adopt a shared JSON Schema published from the Geval repo (see planning notes in your main project).
+
+**Current alignment:** contracts use `combine: worst_case`. Policies include **path** + **rules** only (priority, name, metric, optional component, operator, threshold, action).
 
 ## License
 

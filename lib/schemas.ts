@@ -1,6 +1,8 @@
 import { z } from "zod";
 
-export const combineRuleSchema = z.enum(["all_pass", "any_block_blocks"]);
+export const COMBINE_RULE = "worst_case" as const;
+
+export const combineRuleSchema = z.enum([COMBINE_RULE]);
 
 export const operatorSchema = z.enum([
   ">",
@@ -13,19 +15,16 @@ export const operatorSchema = z.enum([
 
 export const actionSchema = z.enum(["pass", "block", "require_approval"]);
 
+/** Minimal rule: condition + outcome (optional component to scope the metric). */
 export const ruleFormSchema = z
   .object({
-    priority: z.coerce.number().int().min(0),
+    priority: z.coerce.number().int().min(1),
     name: z.string().min(1, "Rule name is required"),
     metric: z.string().min(1, "Metric is required"),
     component: z.string(),
-    system: z.string(),
-    agent: z.string(),
-    step: z.string(),
     operator: operatorSchema,
     threshold: z.string(),
     action: actionSchema,
-    reason: z.string(),
   })
   .superRefine((data, ctx) => {
     if (data.operator !== "presence") {
@@ -40,16 +39,27 @@ export const ruleFormSchema = z
     }
   });
 
-export const policyFormSchema = z.object({
-  path: z
-    .string()
-    .min(1, "Policy file path is required")
-    .regex(/\.(ya?ml)$/i, "Path should end in .yaml or .yml"),
-  name: z.string(),
-  version: z.string(),
-  environment: z.string(),
-  rules: z.array(ruleFormSchema).min(1, "At least one rule per policy"),
-});
+export const policyFormSchema = z
+  .object({
+    path: z
+      .string()
+      .min(1, "Policy file path is required")
+      .regex(/\.(ya?ml)$/i, "Path should end in .yaml or .yml"),
+    rules: z.array(ruleFormSchema).min(1, "At least one rule per policy"),
+  })
+  .superRefine((policy, ctx) => {
+    const seen = new Set<number>();
+    policy.rules.forEach((rule, i) => {
+      if (seen.has(rule.priority)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Duplicate priority ${rule.priority}; each rule needs a unique priority (1 = highest)`,
+          path: ["rules", i, "priority"],
+        });
+      }
+      seen.add(rule.priority);
+    });
+  });
 
 export const contractFormSchema = z.object({
   name: z.string().min(1, "Contract name is required"),
@@ -75,22 +85,15 @@ export function defaultRule(): RuleForm {
     name: "new_rule",
     metric: "accuracy",
     component: "",
-    system: "",
-    agent: "",
-    step: "",
     operator: ">=",
     threshold: "0.9",
     action: "pass",
-    reason: "",
   };
 }
 
 export function defaultPolicy(index: number): PolicyForm {
   return {
     path: index === 0 ? "policy.yaml" : `policies/gate-${index + 1}.yaml`,
-    name: "",
-    version: "",
-    environment: "prod",
     rules: [defaultRule()],
   };
 }
@@ -100,7 +103,7 @@ export function defaultAppState(): AppState {
     contract: {
       name: "release-gate",
       version: "1.0.0",
-      combine: "all_pass",
+      combine: COMBINE_RULE,
     },
     policies: [defaultPolicy(0)],
   };

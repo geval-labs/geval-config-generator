@@ -1,12 +1,10 @@
 import { stringify } from "yaml";
 import type { ContractForm, PolicyForm, RuleForm } from "./schemas";
+import { COMBINE_RULE } from "./schemas";
 
 function buildWhen(r: RuleForm): Record<string, unknown> {
   const w: Record<string, unknown> = {};
-  if (r.system.trim()) w.system = r.system.trim();
-  if (r.agent.trim()) w.agent = r.agent.trim();
   if (r.component.trim()) w.component = r.component.trim();
-  if (r.step.trim()) w.step = r.step.trim();
   if (r.metric.trim()) w.metric = r.metric.trim();
   w.operator = r.operator;
   if (r.operator !== "presence") {
@@ -16,30 +14,21 @@ function buildWhen(r: RuleForm): Record<string, unknown> {
 }
 
 function buildRule(r: RuleForm) {
-  const then: Record<string, unknown> = { action: r.action };
-  if (r.reason.trim()) then.reason = r.reason.trim();
   return {
     priority: r.priority,
     name: r.name.trim(),
     when: buildWhen(r),
-    then,
+    then: { action: r.action },
   };
 }
 
-/** Geval-compatible policy YAML (wrapped `policy:` block, like geval examples). */
+/** Geval-compatible policy YAML (wrapped `policy:` block). */
 export function buildPolicyYaml(p: PolicyForm): string {
-  const policyInner: Record<string, unknown> = {
-    rules: p.rules.map(buildRule),
-  };
-  if (p.environment.trim()) {
-    policyInner.environment = p.environment.trim();
-  }
-
   const doc: Record<string, unknown> = {
-    policy: policyInner,
+    policy: {
+      rules: p.rules.map(buildRule),
+    },
   };
-  if (p.name.trim()) doc.name = p.name.trim();
-  if (p.version.trim()) doc.version = p.version.trim();
 
   return stringify(doc, {
     lineWidth: 100,
@@ -52,10 +41,11 @@ export function buildContractYaml(
   c: ContractForm,
   policyPathsInOrder: string[],
 ): string {
+  const combine = c.combine ?? COMBINE_RULE;
   const doc = {
     name: c.name.trim(),
     version: c.version.trim(),
-    combine: c.combine,
+    combine,
     policies: policyPathsInOrder.map((path) => ({ path: path.trim() })),
   };
   return stringify(doc, {
